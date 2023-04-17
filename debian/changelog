@@ -1,3 +1,9 @@
+ats-aws-sigv4 (0.1.0-1ppa1~ubuntu20.04) focal; urgency=medium
+
+  * Modify debian-branch for Ubuntu 20.04 LTS
+
+ -- Hiroaki Nakamura <hnakamur@gmail.com>  Mon, 17 Apr 2023 17:22:54 +0900
+
 ats-aws-sigv4 (0.1.0-1ppa1~ubuntu18.04) bionic; urgency=medium
 
   * New upstream version 0.1.0
