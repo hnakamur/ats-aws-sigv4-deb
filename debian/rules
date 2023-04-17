@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	make install PREFIX=/usr DESTDIR=$$PWD/debian/tmp/ MULTILIB=lib/$(DEB_HOST_MULTIARCH)
+
+override_dh_auto_test:
+	@echo skip test

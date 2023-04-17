@@ -1,0 +1,8 @@
+Format: http://dep.debian.net/deps/dep5/
+Upstream-Name: ngx-ats-lmdb
+Upstream-Contact: Hiroaki Nakamura, https://github.com/hnakamur/
+Source: https://github.com/hnakamur/ats-aws-sigv4
+
+File: *
+Copyright: 2023, Hiroaki Nakamura
+License: MIT/X

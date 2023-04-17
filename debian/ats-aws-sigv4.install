@@ -1,0 +1,3 @@
+atsgenawssigv4.lua	usr/share/luajit-2.1.0-beta3
+genawssigv4.lua	usr/share/luajit-2.1.0-beta3
+usr/lib/*/*.so
