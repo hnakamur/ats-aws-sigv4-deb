@@ -21,8 +21,8 @@ typedef struct {
     const char *method;
     size_t method_len;
 
-    const char *url_path;
-    size_t url_path_len;
+    const char *escaped_url_path;
+    size_t escaped_url_path_len;
 
     const char *query;
     size_t query_len;
@@ -44,5 +44,8 @@ int generate_aws_sigv4(generate_aws_sigv4_params_t *param);
 
 /* caller must provide memory for out with 17 bytes (YYYYmmddTHHMMSSZ + '\0') */
 void sprint_iso8601_date(char *out, time_t utc_time);
+
+size_t escape_uri_path(const unsigned char *src, size_t src_len,
+                       char *dst, size_t dest_len);
 
 #endif /* ifndef GENERATE_AWS_SIGV4_H_ */
