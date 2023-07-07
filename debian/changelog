@@ -1,3 +1,9 @@
+ats-aws-sigv4 (0.2.0-1ppa1~ubuntu18.04) bionic; urgency=medium
+
+  * New upstream version 0.2.0
+
+ -- Hiroaki Nakamura <hnakamur@gmail.com>  Fri, 07 Jul 2023 20:54:16 +0900
+
 ats-aws-sigv4 (0.1.0-1ppa1~ubuntu18.04) bionic; urgency=medium
 
   * New upstream version 0.1.0
