@@ -22,8 +22,8 @@ ffi.cdef[[
         const char *method;
         size_t method_len;
     
-        const char *url_path;
-        size_t url_path_len;
+        const char *escaped_url_path;
+        size_t escaped_url_path_len;
 
         const char *query;
         size_t query_len;
@@ -45,11 +45,14 @@ ffi.cdef[[
 
     /* caller must provide memory for out with 17 bytes (YYYYmmddTHHMMSSZ + '\0') */
     void sprint_iso8601_date(char *out, time_t utc_time);
+
+    size_t escape_uri_path(const unsigned char *src, size_t src_len,
+                           char *dst, size_t dest_len);
 ]]
 
 local c_buf_type = ffi.typeof("char[?]")
 
-local function generate_aws_sigv4(access_key_id, secret_access_key, region, date_iso8601, method, url_path, query, headers)
+local function generate_aws_sigv4(access_key_id, secret_access_key, region, date_iso8601, method, escaped_url_path, query, headers)
     local params = ffi.new("generate_aws_sigv4_params_t[1]")
     params[0].access_key_id = access_key_id
     params[0].access_key_id_len = #access_key_id
@@ -60,11 +63,11 @@ local function generate_aws_sigv4(access_key_id, secret_access_key, region, date
     params[0].date_iso8601 = date_iso8601
     params[0].method = method
     params[0].method_len = #method
-    params[0].url_path = url_path
-    if url_path == nil then
-        params[0].url_path_len = 0
+    params[0].escaped_url_path = escaped_url_path
+    if escaped_url_path == nil then
+        params[0].escaped_url_path_len = 0
     else
-        params[0].url_path_len = #url_path
+        params[0].escaped_url_path_len = #escaped_url_path
     end
     params[0].query = query
     if query == nil then
@@ -97,7 +100,23 @@ local function format_iso8601_date(abs_num_time)
     return ffi.string(date_buf, date_iso8601_len)
 end
 
+local escaped_path_buf_len = 4096
+local escaped_path_buf = ffi.new(c_buf_type, escaped_path_buf_len)
+
+local function escape_uri_path(path)
+    local buf = escaped_path_buf
+    local buf_len = escaped_path_buf_len
+    local len = S.escape_uri_path(path, #path, buf, buf_len)
+    if len > buf_len then
+        buf_len = len
+        local buf = ffi.new(c_buf_type, buf_len)
+        S.escape_uri_path(path, #path, buf, buf_len)
+    end
+    return ffi.string(buf, len)
+end
+
 return {
     generate_aws_sigv4 = generate_aws_sigv4,
     format_iso8601_date = format_iso8601_date,
+    escape_uri_path = escape_uri_path,
 }
