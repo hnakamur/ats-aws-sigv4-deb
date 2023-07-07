@@ -74,9 +74,9 @@ int generate_aws_sigv4(generate_aws_sigv4_params_t *param)
         .pHttpMethod = param->method,
         .httpMethodLen = param->method_len,
         /* None of the requests parameters below are pre-canonicalized */
-        .flags = SIGV4_HTTP_PAYLOAD_IS_HASH,
-        .pPath = param->url_path,
-        .pathLen = param->url_path_len,
+        .flags = SIGV4_HTTP_PATH_IS_CANONICAL_FLAG | SIGV4_HTTP_PAYLOAD_IS_HASH,
+        .pPath = param->escaped_url_path,
+        .pathLen = param->escaped_url_path_len,
         /* AWS S3 request does not require any Query parameters. */
         .pQuery = param->query,
         .queryLen = param->query_len,
@@ -111,4 +111,70 @@ void sprint_iso8601_date(char *out, time_t utc_time)
     snprintf(out, sizeof("YYYYmmDDTHHMMSSZ"), "%04d%02d%02dT%02d%02d%02dZ",
              1900 + p->tm_year, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min,
              p->tm_sec);
+}
+
+static int should_escape(unsigned char c)
+{
+    /*
+     * path-absolute = "/" [ segment-nz *( "/" segment ) ]
+     * segment       = *pchar
+     * segment-nz    = 1*pchar
+     * pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
+     *
+     * https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
+     */
+    if (c == '/' ||
+        /*
+         * unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
+         */
+        ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') ||
+        (c == '-' || c == '.' || c == '_' || c == '~') ||
+        /*
+         * sub-delims = "!" / "$" / "&" / "'" / "(" / ")"
+         *            / "*" / "+" / "," / ";" / "="
+         */
+        c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')' ||
+        c == '*' || c == '+' || c == ',' || c == ';' || c == '=' ||
+        /*
+         * ":" / "@"
+         */
+        c == ':' || c == '@')
+    {
+        return 0;
+    }
+    return 1;
+}
+
+size_t escape_uri_path(const unsigned char *src, size_t src_len,
+                       char *dst, size_t dst_len)
+{
+    static const char upper_hex_digits[] = "0123456789ABCDEF";
+    size_t i, j;
+
+    i = 0;
+    j = 0;
+    for (i = 0; i < src_len; i++) {
+        if (should_escape(src[i])) {
+            if (j < dst_len) {
+                dst[j] = '%';
+            }
+            j++;
+
+            if (j < dst_len) {
+                dst[j] = upper_hex_digits[src[i] >> 4];
+            }
+            j++;
+
+            if (j < dst_len) {
+                dst[j] = upper_hex_digits[src[i] & 0x0F];
+            }
+            j++;
+        } else {
+            if (j < dst_len) {
+                dst[j] = src[i];
+            }
+            j++;
+        }
+    }
+    return j;
 }
