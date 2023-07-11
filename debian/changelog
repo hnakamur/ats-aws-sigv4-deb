@@ -1,3 +1,9 @@
+ats-aws-sigv4 (0.3.0-1ppa1~ubuntu20.04) focal; urgency=medium
+
+  * New upstream version 0.3.0
+
+ -- Hiroaki Nakamura <hnakamur@gmail.com>  Wed, 12 Jul 2023 00:43:16 +0900
+
 ats-aws-sigv4 (0.2.0-1ppa1~ubuntu20.04) focal; urgency=medium
 
   * New upstream version 0.2.0
