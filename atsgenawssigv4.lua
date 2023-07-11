@@ -16,19 +16,19 @@ local function add_aws_sigv4_authorization(ts, access_key_id, secret_access_key,
 
     local uri_path = ts.server_request.get_uri()
     -- print(string.format("uri_path=[%s]", uri_path))
-    local unescaped_url_path = ts.unescape_uri(uri_path)
-    -- print(string.format("unescaped_url_path=[%s]", unescaped_url_path))
-    local escaped_url_path = genawssigv4.escape_uri_path(unescaped_url_path)
-    -- print(string.format("escaped_url_path=[%s]", escaped_url_path))
-    if escaped_url_path ~= uri_path then
-        ts.server_request.set_uri(escaped_url_path)
+    local decoded_uri_path = genawssigv4.percent_decode(uri_path)
+    -- print(string.format("decoded_uri_path=[%s]", decoded_uri_path))
+    local encoded_uri_path = genawssigv4.uri_encode_path(decoded_uri_path)
+    -- print(string.format("encoded_uri_path=[%s]", encoded_uri_path))
+    if encoded_uri_path ~= uri_path then
+        ts.server_request.set_uri(encoded_uri_path)
     end
 
-    local query = ts.server_request.get_uri_args()
+    local encoded_query = ts.server_request.get_uri_args()
 
     local authorization, err = genawssigv4.generate_aws_sigv4(
         access_key_id, secret_access_key, region, date_iso8601, method,
-        escaped_url_path, query, headers)
+        encoded_uri_path, encoded_query, headers)
     if err ~= nil then
         return err
     end

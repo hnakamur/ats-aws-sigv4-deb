@@ -22,11 +22,11 @@ ffi.cdef[[
         const char *method;
         size_t method_len;
     
-        const char *escaped_url_path;
-        size_t escaped_url_path_len;
+        const char *encoded_uri_path;
+        size_t encoded_uri_path_len;
 
-        const char *query;
-        size_t query_len;
+        const char *encoded_query;
+        size_t encoded_query_len;
 
         const char *headers;
         size_t headers_len;
@@ -46,13 +46,18 @@ ffi.cdef[[
     /* caller must provide memory for out with 17 bytes (YYYYmmddTHHMMSSZ + '\0') */
     void sprint_iso8601_date(char *out, time_t utc_time);
 
-    size_t escape_uri_path(const unsigned char *src, size_t src_len,
-                           char *dst, size_t dest_len);
+    size_t uri_encode_path(const unsigned char *src, size_t src_len,
+                           char *dst, size_t dst_len);
+    size_t uri_encode_query_key_or_val(const unsigned char *src, size_t src_len,
+                                       char *dst, size_t dst_len);
+
+    size_t percent_decode(const char *src, size_t src_len,
+                          unsigned char *dst, size_t dst_len);
 ]]
 
 local c_buf_type = ffi.typeof("char[?]")
 
-local function generate_aws_sigv4(access_key_id, secret_access_key, region, date_iso8601, method, escaped_url_path, query, headers)
+local function generate_aws_sigv4(access_key_id, secret_access_key, region, date_iso8601, method, encoded_uri_path, encoded_query, headers)
     local params = ffi.new("generate_aws_sigv4_params_t[1]")
     params[0].access_key_id = access_key_id
     params[0].access_key_id_len = #access_key_id
@@ -63,17 +68,17 @@ local function generate_aws_sigv4(access_key_id, secret_access_key, region, date
     params[0].date_iso8601 = date_iso8601
     params[0].method = method
     params[0].method_len = #method
-    params[0].escaped_url_path = escaped_url_path
-    if escaped_url_path == nil then
-        params[0].escaped_url_path_len = 0
+    params[0].encoded_uri_path = encoded_uri_path
+    if encoded_uri_path == nil then
+        params[0].encoded_uri_path_len = 0
     else
-        params[0].escaped_url_path_len = #escaped_url_path
+        params[0].encoded_uri_path_len = #encoded_uri_path
     end
-    params[0].query = query
-    if query == nil then
-        params[0].query_len = 0
+    params[0].encoded_query = encoded_query
+    if encoded_query == nil then
+        params[0].encoded_query_len = 0
     else
-        params[0].query_len = #query
+        params[0].encoded_query_len = #encoded_query
     end
     params[0].headers = headers
     params[0].headers_len = #headers
@@ -100,17 +105,41 @@ local function format_iso8601_date(abs_num_time)
     return ffi.string(date_buf, date_iso8601_len)
 end
 
-local escaped_path_buf_len = 4096
-local escaped_path_buf = ffi.new(c_buf_type, escaped_path_buf_len)
+local tmp_buf_len = 4096
+local tmp_buf = ffi.new(c_buf_type, tmp_buf_len)
 
-local function escape_uri_path(path)
-    local buf = escaped_path_buf
-    local buf_len = escaped_path_buf_len
-    local len = S.escape_uri_path(path, #path, buf, buf_len)
+local function uri_encode_path(path)
+    local buf = tmp_buf
+    local buf_len = tmp_buf_len
+    local len = S.uri_encode_path(path, #path, buf, buf_len)
     if len > buf_len then
         buf_len = len
         local buf = ffi.new(c_buf_type, buf_len)
-        S.escape_uri_path(path, #path, buf, buf_len)
+        S.uri_encode_path(path, #path, buf, buf_len)
+    end
+    return ffi.string(buf, len)
+end
+
+local function uri_encode_query_key_or_val(query)
+    local buf = tmp_buf
+    local buf_len = tmp_buf_len
+    local len = S.uri_encode_query_key_or_val(query, #query, buf, buf_len)
+    if len > buf_len then
+        buf_len = len
+        local buf = ffi.new(c_buf_type, buf_len)
+        S.uri_encode_query_key_or_val(query, #query, buf, buf_len)
+    end
+    return ffi.string(buf, len)
+end
+
+local function percent_decode(encoded)
+    local buf = tmp_buf
+    local buf_len = tmp_buf_len
+    local len = S.percent_decode(encoded, #encoded, buf, buf_len)
+    if len > buf_len then
+        buf_len = len
+        local buf = ffi.new(c_buf_type, buf_len)
+        S.percent_decode(encoded, #encoded, buf, buf_len)
     end
     return ffi.string(buf, len)
 end
@@ -118,5 +147,7 @@ end
 return {
     generate_aws_sigv4 = generate_aws_sigv4,
     format_iso8601_date = format_iso8601_date,
-    escape_uri_path = escape_uri_path,
+    uri_encode_path = uri_encode_path,
+    uri_encode_query_key_or_val = uri_encode_query_key_or_val,
+    percent_decode = percent_decode,
 }
