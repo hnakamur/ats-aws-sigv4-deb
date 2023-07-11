@@ -74,12 +74,14 @@ int generate_aws_sigv4(generate_aws_sigv4_params_t *param)
         .pHttpMethod = param->method,
         .httpMethodLen = param->method_len,
         /* None of the requests parameters below are pre-canonicalized */
-        .flags = SIGV4_HTTP_PATH_IS_CANONICAL_FLAG | SIGV4_HTTP_PAYLOAD_IS_HASH,
-        .pPath = param->escaped_url_path,
-        .pathLen = param->escaped_url_path_len,
+        .flags = SIGV4_HTTP_PATH_IS_CANONICAL_FLAG |
+                 SIGV4_HTTP_QUERY_IS_CANONICAL_FLAG |
+                 SIGV4_HTTP_PAYLOAD_IS_HASH,
+        .pPath = param->encoded_uri_path,
+        .pathLen = param->encoded_uri_path_len,
         /* AWS S3 request does not require any Query parameters. */
-        .pQuery = param->query,
-        .queryLen = param->query_len,
+        .pQuery = param->encoded_query,
+        .queryLen = param->encoded_query_len,
         .pHeaders = param->headers,
         .headersLen = param->headers_len,
         .pPayload = S3_REQUEST_EMPTY_PAYLOAD,
@@ -113,48 +115,38 @@ void sprint_iso8601_date(char *out, time_t utc_time)
              p->tm_sec);
 }
 
-static int should_escape(unsigned char c)
+static int should_escape(unsigned char c, int encodes_slash)
 {
-    /*
-     * path-absolute = "/" [ segment-nz *( "/" segment ) ]
-     * segment       = *pchar
-     * segment-nz    = 1*pchar
-     * pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
-     *
-     * https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
-     */
-    if (c == '/' ||
-        /*
-         * unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
-         */
-        ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') ||
-        (c == '-' || c == '.' || c == '_' || c == '~') ||
-        /*
-         * sub-delims = "!" / "$" / "&" / "'" / "(" / ")"
-         *            / "*" / "+" / "," / ";" / "="
-         */
-        c == '!' || c == '$' || c == '&' || c == '\'' || c == '(' || c == ')' ||
-        c == '*' || c == '+' || c == ',' || c == ';' || c == '=' ||
-        /*
-         * ":" / "@"
-         */
-        c == ':' || c == '@')
-    {
-        return 0;
-    }
-    return 1;
+    return ((c == '/' && !encodes_slash) ||
+            ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') ||
+            ('0' <= c && c <= '9') ||
+            (c == '-' || c == '.' || c == '_' || c == '~'))
+           ? 0 : 1;
 }
 
-size_t escape_uri_path(const unsigned char *src, size_t src_len,
-                       char *dst, size_t dst_len)
+static size_t uri_encode(const unsigned char *src, size_t src_len,
+                         char *dst, size_t dst_len,
+                         int encodes_slash)
 {
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+    // * URI encode every byte except the unreserved characters:
+    //   'A'-'Z', 'a'-'z', '0'-'9', '-', '.', '_', and '~'.
+    // * The space character is a reserved character and must be encoded as
+    //    "%20" (and not as "+").
+    // * Each URI encoded byte is formed by a '%' and the two-digit hexadecimal
+    //   value of the byte.
+    // * Letters in the hexadecimal value must be uppercase, for example "%1A".
+    // * Encode the forward slash character, '/', everywhere except in the
+    //   object key name. For example, if the object key name is
+    //   photos/Jan/sample.jpg, the forward slash in the key name is not
+    //   encoded.
+
     static const char upper_hex_digits[] = "0123456789ABCDEF";
     size_t i, j;
 
-    i = 0;
     j = 0;
     for (i = 0; i < src_len; i++) {
-        if (should_escape(src[i])) {
+        if (should_escape(src[i], encodes_slash)) {
             if (j < dst_len) {
                 dst[j] = '%';
             }
@@ -172,6 +164,68 @@ size_t escape_uri_path(const unsigned char *src, size_t src_len,
         } else {
             if (j < dst_len) {
                 dst[j] = src[i];
+            }
+            j++;
+        }
+    }
+    return j;
+}
+
+size_t uri_encode_path(const unsigned char *src, size_t src_len,
+                       char *dst, size_t dst_len)
+{
+    return uri_encode(src, src_len, dst, dst_len, 0);
+}
+
+size_t uri_encode_query_key_or_val(const unsigned char *src, size_t src_len,
+                                   char *dst, size_t dst_len)
+{
+    return uri_encode(src, src_len, dst, dst_len, 1);
+}
+
+static int is_hex_char(char c)
+{
+    return ('0' <= c && c <= '9') ||
+           ('A' <= c && c <= 'F') ||
+           ('a' <= c && c <= 'f');
+}
+
+static int hex_char_to_digit(char c)
+{
+    if ('0' <= c && c <= '9') {
+        return c - '0';
+    } else if ('A' <= c && c <= 'F') {
+        return c - 'A' + 10;
+    } else if ('a' <= c && c <= 'f') {
+        return c - 'a' + 10;
+    } else {
+        return -1;
+    }
+}
+
+static unsigned char percent_decode_char(char hi, char lo)
+{
+    return hex_char_to_digit(hi) << 4 | hex_char_to_digit(lo);
+}
+
+size_t percent_decode(const char *src, size_t src_len,
+                      unsigned char *dst, size_t dst_len)
+{
+    size_t i, j;
+
+    j = 0;
+    for (i = 0; i < src_len; i++) {
+        if (src[i] == '%' && i + 2 < src_len &&
+            is_hex_char(src[i + 1]) && is_hex_char(src[i + 2]))
+        {
+            if (j < dst_len) {
+                dst[j] = percent_decode_char(src[i + 1], src[i + 2]);
+            }
+            j++;
+            i += 2;
+        } else {
+            if (j < dst_len) {
+                dst[j] = (unsigned char) src[i];
             }
             j++;
         }
