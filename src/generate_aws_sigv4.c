@@ -232,3 +232,28 @@ size_t percent_decode(const char *src, size_t src_len,
     }
     return j;
 }
+
+size_t www_form_url_decode(const char *src, size_t src_len,
+                           unsigned char *dst, size_t dst_len)
+{
+    size_t i, j;
+
+    j = 0;
+    for (i = 0; i < src_len; i++) {
+        if (src[i] == '%' && i + 2 < src_len &&
+            is_hex_char(src[i + 1]) && is_hex_char(src[i + 2]))
+        {
+            if (j < dst_len) {
+                dst[j] = percent_decode_char(src[i + 1], src[i + 2]);
+            }
+            j++;
+            i += 2;
+        } else {
+            if (j < dst_len) {
+                dst[j] = (unsigned char)(src[i] == '+' ? ' ' : src[i]);
+            }
+            j++;
+        }
+    }
+    return j;
+}

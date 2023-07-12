@@ -53,6 +53,9 @@ ffi.cdef[[
 
     size_t percent_decode(const char *src, size_t src_len,
                           unsigned char *dst, size_t dst_len);
+
+    size_t www_form_url_decode(const char *src, size_t src_len,
+                               unsigned char *dst, size_t dst_len);
 ]]
 
 local c_buf_type = ffi.typeof("char[?]")
@@ -144,10 +147,23 @@ local function percent_decode(encoded)
     return ffi.string(buf, len)
 end
 
+local function www_form_url_decode(encoded)
+    local buf = tmp_buf
+    local buf_len = tmp_buf_len
+    local len = S.www_form_url_decode(encoded, #encoded, buf, buf_len)
+    if len > buf_len then
+        buf_len = len
+        local buf = ffi.new(c_buf_type, buf_len)
+        S.www_form_url_decode(encoded, #encoded, buf, buf_len)
+    end
+    return ffi.string(buf, len)
+end
+
 return {
     generate_aws_sigv4 = generate_aws_sigv4,
     format_iso8601_date = format_iso8601_date,
     uri_encode_path = uri_encode_path,
     uri_encode_query_key_or_val = uri_encode_query_key_or_val,
     percent_decode = percent_decode,
+    www_form_url_decode = www_form_url_decode,
 }
