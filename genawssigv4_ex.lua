@@ -3,6 +3,7 @@ local genawssigv4 = require "genawssigv4"
 print(string.format("escaped path=[%s]", genawssigv4.uri_encode_path("/aA0-._~!$&'()*+,;=:@/\t%日")))
 print(string.format("escaped query_key=[%s]", genawssigv4.uri_encode_query_key_or_val("/aA0-._~!$&'()*+,;=:@/\t%日")))
 print(string.format("percent decoded=[%s]", genawssigv4.percent_decode("a+b%20c")))
+print(string.format("www form url decoded=[%s]", genawssigv4.www_form_url_decode("a+b%20c")))
 
 local date_iso8601 = genawssigv4.format_iso8601_date(os.time())
 local access_key_id = 'foo'

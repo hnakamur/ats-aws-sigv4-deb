@@ -53,4 +53,7 @@ size_t uri_encode_query_key_or_val(const unsigned char *src, size_t src_len,
 size_t percent_decode(const char *src, size_t src_len,
                       unsigned char *dst, size_t dst_len);
 
+size_t www_form_url_decode(const char *src, size_t src_len,
+                           unsigned char *dst, size_t dst_len);
+
 #endif /* ifndef GENERATE_AWS_SIGV4_H_ */
