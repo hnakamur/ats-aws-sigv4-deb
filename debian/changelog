@@ -1,3 +1,9 @@
+ats-aws-sigv4 (0.4.0-1ppa2~ubuntu18.04) bionic; urgency=medium
+
+  * Change lua file directory to /usr/share/luajit-2.1
+
+ -- Hiroaki Nakamura <hnakamur@gmail.com>  Wed, 25 Oct 2023 10:16:02 +0900
+
 ats-aws-sigv4 (0.4.0-1ppa1~ubuntu18.04) bionic; urgency=medium
 
   * New upstream version 0.4.0
